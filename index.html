@@ -1,0 +1,1767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Meter OCR + GPS + Google Sheet Analyzer</title>
+
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exifr/dist/lite.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+*{box-sizing:border-box}
+body{
+    margin:0;
+    font-family:Arial,Helvetica,sans-serif;
+    background:#f3f6f9;
+    color:#222;
+}
+.container{
+    max-width:1500px;
+    margin:auto;
+    padding:20px;
+}
+h1{
+    margin:0 0 5px;
+    font-size:28px;
+}
+.sub{
+    color:#666;
+    margin-bottom:18px;
+}
+.panel{
+    background:#fff;
+    border-radius:12px;
+    padding:18px;
+    margin-bottom:18px;
+    box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+.row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    align-items:center;
+}
+input[type=file]{
+    padding:8px;
+}
+button{
+    border:0;
+    padding:10px 15px;
+    border-radius:7px;
+    cursor:pointer;
+    font-weight:600;
+}
+.btn{
+    background:#1976d2;
+    color:#fff;
+}
+.btn2{
+    background:#455a64;
+    color:#fff;
+}
+.green{
+    background:#2e7d32;
+    color:#fff;
+}
+.orange{
+    background:#ef6c00;
+    color:#fff;
+}
+.red{
+    background:#c62828;
+    color:#fff;
+}
+.gray{
+    background:#eceff1;
+    color:#263238;
+}
+button:disabled{
+    opacity:.55;
+    cursor:not-allowed;
+}
+
+.cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:12px;
+}
+.card{
+    background:#fff;
+    border-radius:10px;
+    padding:15px;
+    box-shadow:0 2px 8px rgba(0,0,0,.07);
+}
+.card b{
+    display:block;
+    font-size:25px;
+    margin-top:5px;
+}
+.card span{
+    color:#666;
+    font-size:13px;
+}
+
+.status{
+    padding:10px;
+    border-radius:7px;
+    background:#eef3f7;
+    margin-top:10px;
+    font-size:14px;
+}
+
+.table-wrap{
+    overflow:auto;
+}
+table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:1400px;
+}
+th,td{
+    border:1px solid #ddd;
+    padding:7px;
+    font-size:12px;
+    vertical-align:middle;
+}
+th{
+    background:#263238;
+    color:#fff;
+    position:sticky;
+    top:0;
+    z-index:2;
+}
+td img{
+    width:70px;
+    height:70px;
+    object-fit:cover;
+    border-radius:6px;
+    cursor:pointer;
+}
+.badge{
+    display:inline-block;
+    padding:4px 7px;
+    border-radius:5px;
+    font-size:11px;
+    font-weight:bold;
+}
+.ok{
+    background:#dcedc8;
+    color:#33691e;
+}
+.warn{
+    background:#fff3cd;
+    color:#8a5a00;
+}
+.danger{
+    background:#ffcdd2;
+    color:#b71c1c;
+}
+.info{
+    background:#dbeafe;
+    color:#075985;
+}
+a{
+    color:#1565c0;
+    text-decoration:none;
+    font-weight:600;
+}
+a:hover{
+    text-decoration:underline;
+}
+
+.modal{
+    display:none;
+    position:fixed;
+    inset:0;
+    background:rgba(0,0,0,.72);
+    z-index:9999;
+    padding:20px;
+    overflow:auto;
+}
+.modal-box{
+    max-width:800px;
+    margin:30px auto;
+    background:#fff;
+    border-radius:12px;
+    padding:20px;
+}
+.modal img{
+    max-width:100%;
+    max-height:420px;
+    display:block;
+    margin:auto;
+    border-radius:8px;
+}
+.form-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:12px;
+    margin-top:15px;
+}
+.form-grid label{
+    font-size:12px;
+    font-weight:bold;
+    color:#555;
+}
+.form-grid input,.form-grid textarea{
+    width:100%;
+    padding:9px;
+    border:1px solid #bbb;
+    border-radius:6px;
+    margin-top:4px;
+}
+.form-grid textarea{
+    min-height:80px;
+}
+.full{
+    grid-column:1/-1;
+}
+.modal-actions{
+    margin-top:15px;
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.progress{
+    width:100%;
+    height:8px;
+    background:#ddd;
+    border-radius:10px;
+    overflow:hidden;
+    margin-top:8px;
+}
+.progress div{
+    height:100%;
+    width:0%;
+    background:#1976d2;
+}
+
+footer{
+    text-align:center;
+    color:#777;
+    padding:20px;
+    font-size:13px;
+}
+
+@media(max-width:700px){
+    .form-grid{
+        grid-template-columns:1fr;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<h1>📷 Meter OCR + GPS Analyzer</h1>
+<div class="sub">
+Meter Photo → OCR → GPS → Google Sheet Matching → Update / Rechange
+</div>
+
+<div class="panel">
+
+<div class="row">
+
+<input
+    type="file"
+    id="fileInput"
+    accept="image/*"
+    multiple
+>
+
+<button class="btn" onclick="runAnalysis()">
+▶ Run Analysis
+</button>
+
+<button class="btn2" onclick="syncSheet()">
+🔄 Sync Google Sheet
+</button>
+
+<button class="gray" onclick="testConnection()">
+🔗 Test Connection
+</button>
+
+<button class="green" onclick="openGoogleSheet()">
+📊 Open Google Sheet
+</button>
+
+<button class="orange" onclick="downloadExcel()">
+⬇ Download Excel
+</button>
+
+<button class="red" onclick="clearAll()">
+✕ Clear
+</button>
+
+</div>
+
+<div class="status" id="status">
+Ready. Please upload meter photos.
+</div>
+
+<div class="progress">
+<div id="progressBar"></div>
+</div>
+
+</div>
+
+<div class="cards">
+
+<div class="card">
+<span>Total Photos</span>
+<b id="totalCount">0</b>
+</div>
+
+<div class="card">
+<span>Meter Detected</span>
+<b id="meterCount">0</b>
+</div>
+
+<div class="card">
+<span>GPS Detected</span>
+<b id="gpsCount">0</b>
+</div>
+
+<div class="card">
+<span>Already Updated</span>
+<b id="updatedCount">0</b>
+</div>
+
+<div class="card">
+<span>Rechange</span>
+<b id="rechangeCount">0</b>
+</div>
+
+<div class="card">
+<span>Duplicate</span>
+<b id="duplicateCount">0</b>
+</div>
+
+</div>
+
+<div class="panel">
+<h3>Analysis Result</h3>
+
+<div class="table-wrap">
+
+<table id="resultTable">
+
+<thead>
+<tr>
+<th>Sr No</th>
+<th>Photo</th>
+<th>Image Name</th>
+<th>Meter No</th>
+<th>Meter Source</th>
+<th>Latitude</th>
+<th>Longitude</th>
+<th>GPS Source</th>
+<th>Google Maps</th>
+<th>Duplicate</th>
+<th>OCR Text</th>
+<th>Sheet Status</th>
+<th>Sheet Row</th>
+<th>Action</th>
+</tr>
+</thead>
+
+<tbody id="resultBody"></tbody>
+
+</table>
+
+</div>
+</div>
+
+<footer>
+Designed By Mayank Mourya
+</footer>
+
+</div>
+
+
+<!-- EDIT MODAL -->
+
+<div class="modal" id="editModal">
+
+<div class="modal-box">
+
+<h2>✏️ Edit Meter Data</h2>
+
+<img id="editImage" src="">
+
+<div class="form-grid">
+
+<div>
+<label>Meter No</label>
+<input id="editMeter">
+</div>
+
+<div>
+<label>Meter Source</label>
+<input id="editMeterSource">
+</div>
+
+<div>
+<label>Latitude</label>
+<input id="editLat">
+</div>
+
+<div>
+<label>Longitude</label>
+<input id="editLon">
+</div>
+
+<div>
+<label>GPS Source</label>
+<input id="editGpsSource">
+</div>
+
+<div>
+<label>Remark</label>
+<input id="editRemark">
+</div>
+
+<div class="full">
+<label>OCR Text</label>
+<textarea id="editOCR" readonly></textarea>
+</div>
+
+</div>
+
+<div class="modal-actions">
+
+<button class="green" onclick="saveEdit()">
+💾 Save Local
+</button>
+
+<button class="btn" onclick="saveEditAndUpdate()">
+☁ Save + Update Sheet
+</button>
+
+<button class="orange" onclick="saveEditAndRechange()">
+🔁 Rechange
+</button>
+
+<button class="gray" onclick="closeModal()">
+Close
+</button>
+
+</div>
+
+</div>
+
+</div>
+
+
+<script>
+
+/* =========================================================
+   GOOGLE CONFIG
+========================================================= */
+
+const APPS_SCRIPT_URL =
+"https://script.google.com/macros/s/AKfycbyKO6c2cD7fcH8H2IATp87aU7z9nMrikOPnTHpyY2gb4umtMAAbMWrQxLf04Lh9eKiT/exec";
+
+const GOOGLE_SHEET_URL =
+"https://docs.google.com/spreadsheets/d/1lHJB4bvDK9XDr4LV79XZrh90TAuE2azN9ebT6zOPwRo/edit";
+
+
+/* =========================================================
+   SHEET COLUMNS
+========================================================= */
+
+const SHEET_HEADERS = [
+    "Sr No",
+    "Image Name",
+    "Meter No",
+    "Meter Source",
+    "Latitude",
+    "Longitude",
+    "GPS Source",
+    "Google Maps",
+    "Duplicate",
+    "OCR Text",
+    "Remark /Updated / Rechange/already updated",
+    "Last update Date"
+];
+
+
+/* =========================================================
+   GLOBAL DATA
+========================================================= */
+
+let records = [];
+let sheetRows = [];
+let editingIndex = -1;
+
+
+/* =========================================================
+   FILE INPUT
+========================================================= */
+
+document.getElementById("fileInput")
+.addEventListener("change", function(){
+
+    records = [];
+
+    for(let i=0;i<this.files.length;i++){
+
+        records.push({
+            srNo:i+1,
+            file:this.files[i],
+            imageName:this.files[i].name,
+            meterNo:"",
+            meterSource:"",
+            latitude:"",
+            longitude:"",
+            gpsSource:"",
+            googleMaps:"",
+            duplicate:"",
+            ocrText:"",
+            sheetStatus:"",
+            sheetRow:"",
+            sheetGid:"",
+            remark:"",
+            lastUpdate:"",
+            previewUrl:URL.createObjectURL(this.files[i])
+        });
+
+    }
+
+    renderTable();
+    updateCards();
+
+    setStatus(
+        records.length +
+        " photo(s) selected. Click Run Analysis."
+    );
+
+});
+
+
+/* =========================================================
+   RUN ANALYSIS
+========================================================= */
+
+async function runAnalysis(){
+
+    if(!records.length){
+
+        alert("Please upload meter photos first.");
+        return;
+
+    }
+
+    const total = records.length;
+
+    setStatus("Starting OCR + GPS analysis...");
+
+    for(let i=0;i<total;i++){
+
+        const r = records[i];
+
+        try{
+
+            setStatus(
+                `Processing ${i+1}/${total}: ${r.imageName}`
+            );
+
+            setProgress((i/total)*100);
+
+            /* GPS */
+
+            try{
+
+                const gps = await exifr.gps(r.file);
+
+                if(gps){
+
+                    r.latitude =
+                        gps.latitude ??
+                        "";
+
+                    r.longitude =
+                        gps.longitude ??
+                        "";
+
+                    if(
+                        r.latitude !== "" &&
+                        r.longitude !== ""
+                    ){
+                        r.gpsSource = "EXIF GPS";
+                    }
+
+                }
+
+            }catch(e){
+                console.log("GPS:",e);
+            }
+
+
+            /* OCR */
+
+            try{
+
+                const result =
+                    await Tesseract.recognize(
+                        r.file,
+                        "eng",
+                        {
+                            logger:m=>{
+                                if(m.status==="recognizing text"){
+                                    const base = i/total*100;
+                                    const part = (m.progress||0)/total*100;
+                                    setProgress(
+                                        Math.min(99,base+part)
+                                    );
+                                }
+                            }
+                        }
+                    );
+
+                r.ocrText =
+                    result.data.text || "";
+
+                r.meterNo =
+                    detectMeter(r.ocrText);
+
+                if(r.meterNo){
+
+                    r.meterSource = "OCR";
+
+                }
+
+            }catch(e){
+
+                console.error("OCR:",e);
+
+            }
+
+        }catch(e){
+
+            console.error(e);
+
+        }
+
+        renderTable();
+
+    }
+
+    setProgress(100);
+
+    setStatus(
+        "OCR + GPS analysis completed. Checking Google Sheet..."
+    );
+
+    await syncSheet(false);
+
+    setStatus("Analysis completed.");
+
+}
+
+
+/* =========================================================
+   METER DETECTION
+========================================================= */
+
+function detectMeter(text){
+
+    if(!text) return "";
+
+    let clean =
+        text
+        .replace(/\r/g," ")
+        .replace(/\n/g," ");
+
+    let patterns = [
+
+        /\bT0[-_\s]?\d{5,12}\b/ig,
+        /\bT[-_\s]?\d{5,12}\b/ig,
+        /\b\d{6,12}\b/g
+
+    ];
+
+    for(const p of patterns){
+
+        const match = clean.match(p);
+
+        if(match && match.length){
+
+            let value =
+                match[0]
+                .replace(/[\s_-]/g,"")
+                .toUpperCase();
+
+            if(/^\d+$/.test(value)){
+                return value;
+            }
+
+            return value;
+
+        }
+
+    }
+
+    return "";
+
+}
+
+
+/* =========================================================
+   GOOGLE SHEET TEST
+========================================================= */
+
+async function testConnection(){
+
+    try{
+
+        setStatus("Testing Google Sheet connection...");
+
+        const response =
+            await fetch(
+                APPS_SCRIPT_URL +
+                "?action=health&t=" +
+                Date.now()
+            );
+
+        const data =
+            await response.json();
+
+        if(data.ok){
+
+            setStatus(
+                "✅ Google Apps Script connection successful."
+            );
+
+        }else{
+
+            setStatus(
+                "❌ Connection failed."
+            );
+
+        }
+
+    }catch(e){
+
+        console.error(e);
+
+        setStatus(
+            "❌ Connection error: " + e.message
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   SYNC GOOGLE SHEET
+========================================================= */
+
+async function syncSheet(showMessage=true){
+
+    try{
+
+        if(showMessage){
+            setStatus("Reading Google Sheet...");
+        }
+
+        const response =
+            await fetch(
+                APPS_SCRIPT_URL +
+                "?action=all&t=" +
+                Date.now()
+            );
+
+        const data =
+            await response.json();
+
+        if(!data.ok){
+
+            throw new Error(
+                data.error || "Unable to read Sheet"
+            );
+
+        }
+
+        sheetRows =
+            Array.isArray(data.rows)
+            ? data.rows
+            : [];
+
+        matchSheetData();
+
+        renderTable();
+        updateCards();
+
+        if(showMessage){
+
+            setStatus(
+                "✅ Google Sheet synced. " +
+                sheetRows.length +
+                " row(s) loaded."
+            );
+
+        }
+
+    }catch(e){
+
+        console.error(e);
+
+        setStatus(
+            "❌ Google Sheet sync failed: " +
+            e.message
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   MATCH SHEET DATA
+========================================================= */
+
+function matchSheetData(){
+
+    records.forEach(r=>{
+
+        r.sheetStatus = "";
+        r.sheetRow = "";
+        r.sheetGid = "";
+
+        let found = null;
+
+        /* 1. Meter No match */
+
+        if(r.meterNo){
+
+            found =
+                sheetRows.find(s =>
+                    normalize(s.meterNo) ===
+                    normalize(r.meterNo)
+                );
+
+        }
+
+        /* 2. Image Name match */
+
+        if(!found && r.imageName){
+
+            found =
+                sheetRows.find(s =>
+                    normalize(s.imageName) ===
+                    normalize(r.imageName)
+                );
+
+        }
+
+        if(!found){
+
+            return;
+
+        }
+
+
+        r.sheetRow =
+            found.rowNumber || "";
+
+        r.sheetGid =
+            found.gid || "";
+
+        r.remark =
+            found.remark || "";
+
+        r.lastUpdate =
+            found.lastUpdate || "";
+
+
+        /* Recover Meter */
+
+        if(
+            !r.meterNo &&
+            found.meterNo
+        ){
+
+            r.meterNo =
+                found.meterNo;
+
+            r.meterSource =
+                "Google Sheet";
+
+        }
+
+
+        /* Recover GPS */
+
+        if(
+            (!r.latitude || !r.longitude) &&
+            found.latitude &&
+            found.longitude
+        ){
+
+            r.latitude =
+                found.latitude;
+
+            r.longitude =
+                found.longitude;
+
+            r.gpsSource =
+                "Google Sheet";
+
+        }
+
+
+        /* Status */
+
+        if(
+            String(found.remark || "").trim() ||
+            String(found.lastUpdate || "").trim()
+        ){
+
+            r.sheetStatus =
+                "ALREADY_UPDATED";
+
+        }else{
+
+            r.sheetStatus =
+                "PENDING";
+
+        }
+
+
+        updateMapLink(r);
+
+    });
+
+
+    detectDuplicates();
+
+}
+
+
+/* =========================================================
+   DUPLICATE DETECTION
+========================================================= */
+
+function detectDuplicates(){
+
+    const map = {};
+
+    records.forEach(r=>{
+
+        r.duplicate = "";
+
+        if(!r.meterNo) return;
+
+        const key =
+            normalize(r.meterNo);
+
+        if(!map[key]){
+            map[key] = [];
+        }
+
+        map[key].push(r);
+
+    });
+
+
+    Object.keys(map).forEach(key=>{
+
+        if(map[key].length > 1){
+
+            map[key].forEach(r=>{
+                r.duplicate = "DUPLICATE";
+            });
+
+        }
+
+    });
+
+}
+
+
+/* =========================================================
+   UPDATE MAP
+========================================================= */
+
+function updateMapLink(r){
+
+    if(
+        r.latitude !== "" &&
+        r.longitude !== "" &&
+        !isNaN(Number(r.latitude)) &&
+        !isNaN(Number(r.longitude))
+    ){
+
+        r.googleMaps =
+            "https://www.google.com/maps?q=" +
+            encodeURIComponent(
+                r.latitude + "," + r.longitude
+            );
+
+    }else{
+
+        r.googleMaps = "";
+
+    }
+
+}
+
+
+/* =========================================================
+   RENDER TABLE
+========================================================= */
+
+function renderTable(){
+
+    const body =
+        document.getElementById("resultBody");
+
+    body.innerHTML = "";
+
+    records.forEach((r,index)=>{
+
+        const tr =
+            document.createElement("tr");
+
+        const statusHtml =
+            r.sheetStatus === "ALREADY_UPDATED"
+
+            ? `<span class="badge ok">
+                Already Updated
+               </span>`
+
+            : r.sheetStatus === "PENDING"
+
+            ? `<span class="badge warn">
+                Pending
+               </span>`
+
+            : `<span class="badge info">
+                Not Checked
+               </span>`;
+
+
+        let actionHtml = "";
+
+        if(r.sheetStatus === "ALREADY_UPDATED"){
+
+            actionHtml +=
+                `<button class="orange"
+                    onclick="rechange(${index})">
+                    Rechange
+                </button>`;
+
+        }else{
+
+            actionHtml +=
+                `<button class="green"
+                    onclick="updateSheet(${index})">
+                    Update
+                </button>`;
+
+        }
+
+
+        actionHtml +=
+            ` <button class="gray"
+                onclick="openEdit(${index})">
+                Edit
+              </button>`;
+
+
+        let rowLink = "";
+
+        if(r.sheetRow){
+
+            const gid =
+                r.sheetGid || 0;
+
+            const url =
+                GOOGLE_SHEET_URL +
+                "#gid=" +
+                encodeURIComponent(gid) +
+                "&range=A" +
+                r.sheetRow;
+
+            rowLink =
+                `<a href="${url}"
+                    target="_blank">
+                    View Row ${r.sheetRow}
+                 </a>`;
+
+        }
+
+
+        tr.innerHTML = `
+
+        <td>${r.srNo}</td>
+
+        <td>
+            <img
+                src="${r.previewUrl}"
+                onclick="viewPhoto(${index})"
+                title="View Photo"
+            >
+        </td>
+
+        <td>${escapeHtml(r.imageName)}</td>
+
+        <td>
+            ${
+                r.meterNo
+                ? escapeHtml(r.meterNo)
+                : `<span class="badge danger">
+                    Not Found
+                   </span>`
+            }
+        </td>
+
+        <td>${escapeHtml(r.meterSource || "")}</td>
+
+        <td>${escapeHtml(String(r.latitude || ""))}</td>
+
+        <td>${escapeHtml(String(r.longitude || ""))}</td>
+
+        <td>${escapeHtml(r.gpsSource || "")}</td>
+
+        <td>
+            ${
+                r.googleMaps
+                ? `<a href="${r.googleMaps}"
+                     target="_blank">
+                     📍 Map
+                   </a>`
+                : ""
+            }
+        </td>
+
+        <td>
+            ${
+                r.duplicate
+                ? `<span class="badge danger">
+                    ${r.duplicate}
+                   </span>`
+                : `<span class="badge ok">
+                    No
+                   </span>`
+            }
+        </td>
+
+        <td>
+            <details>
+                <summary>View OCR</summary>
+                <div style="max-width:350px;white-space:pre-wrap">
+                    ${escapeHtml(r.ocrText || "")}
+                </div>
+            </details>
+        </td>
+
+        <td>
+            ${statusHtml}
+            <br>
+            <small>
+                ${escapeHtml(r.remark || "")}
+            </small>
+        </td>
+
+        <td>
+            ${rowLink}
+        </td>
+
+        <td>
+            ${actionHtml}
+        </td>
+
+        `;
+
+        body.appendChild(tr);
+
+    });
+
+    updateCards();
+
+}
+
+
+/* =========================================================
+   OPEN PHOTO
+========================================================= */
+
+function viewPhoto(index){
+
+    editingIndex = index;
+
+    const r = records[index];
+
+    document.getElementById("editImage").src =
+        r.previewUrl;
+
+    document.getElementById("editMeter").value =
+        r.meterNo || "";
+
+    document.getElementById("editMeterSource").value =
+        r.meterSource || "";
+
+    document.getElementById("editLat").value =
+        r.latitude || "";
+
+    document.getElementById("editLon").value =
+        r.longitude || "";
+
+    document.getElementById("editGpsSource").value =
+        r.gpsSource || "";
+
+    document.getElementById("editRemark").value =
+        r.remark || "";
+
+    document.getElementById("editOCR").value =
+        r.ocrText || "";
+
+    document.getElementById("editModal").style.display =
+        "block";
+
+}
+
+
+function openEdit(index){
+    viewPhoto(index);
+}
+
+
+function closeModal(){
+
+    document.getElementById("editModal").style.display =
+        "none";
+
+    editingIndex = -1;
+
+}
+
+
+/* =========================================================
+   SAVE EDIT
+========================================================= */
+
+function collectEdit(){
+
+    if(editingIndex < 0) return;
+
+    const r =
+        records[editingIndex];
+
+    r.meterNo =
+        document.getElementById("editMeter")
+        .value.trim()
+        .toUpperCase();
+
+    r.meterSource =
+        document.getElementById("editMeterSource")
+        .value.trim();
+
+    r.latitude =
+        document.getElementById("editLat")
+        .value.trim();
+
+    r.longitude =
+        document.getElementById("editLon")
+        .value.trim();
+
+    r.gpsSource =
+        document.getElementById("editGpsSource")
+        .value.trim();
+
+    r.remark =
+        document.getElementById("editRemark")
+        .value.trim();
+
+    updateMapLink(r);
+
+    detectDuplicates();
+
+}
+
+
+/* =========================================================
+   SAVE LOCAL
+========================================================= */
+
+function saveEdit(){
+
+    collectEdit();
+
+    renderTable();
+
+    closeModal();
+
+    setStatus(
+        "✅ Changes saved locally."
+    );
+
+}
+
+
+/* =========================================================
+   SAVE + UPDATE
+========================================================= */
+
+async function saveEditAndUpdate(){
+
+    collectEdit();
+
+    renderTable();
+
+    closeModal();
+
+    if(editingIndex >= 0){
+
+        await updateSheet(editingIndex);
+
+    }
+
+}
+
+
+/* =========================================================
+   SAVE + RECHANGE
+========================================================= */
+
+async function saveEditAndRechange(){
+
+    collectEdit();
+
+    renderTable();
+
+    closeModal();
+
+    if(editingIndex >= 0){
+
+        await rechange(editingIndex);
+
+    }
+
+}
+
+
+/* =========================================================
+   UPDATE SHEET
+========================================================= */
+
+async function updateSheet(index){
+
+    const r = records[index];
+
+    if(!r.meterNo && !r.imageName){
+
+        alert("Meter No or Image Name required.");
+        return;
+
+    }
+
+    await saveToSheet(
+        r,
+        "Updated"
+    );
+
+}
+
+
+/* =========================================================
+   RECHANGE
+========================================================= */
+
+async function rechange(index){
+
+    const r = records[index];
+
+    await saveToSheet(
+        r,
+        "Rechange"
+    );
+
+}
+
+
+/* =========================================================
+   SAVE TO GOOGLE SHEET
+========================================================= */
+
+async function saveToSheet(r,remarkType){
+
+    try{
+
+        setStatus(
+            "Saving " +
+            remarkType +
+            " to Google Sheet..."
+        );
+
+
+        const payload = {
+
+            action:"save",
+
+            rowNumber:
+                r.sheetRow || "",
+
+            imageName:
+                r.imageName,
+
+            meterNo:
+                r.meterNo,
+
+            meterSource:
+                r.meterSource,
+
+            latitude:
+                r.latitude,
+
+            longitude:
+                r.longitude,
+
+            gpsSource:
+                r.gpsSource,
+
+            googleMaps:
+                r.googleMaps,
+
+            duplicate:
+                r.duplicate,
+
+            ocrText:
+                r.ocrText,
+
+            remark:
+                remarkType,
+
+            lastUpdate:""
+
+        };
+
+
+        const response =
+            await fetch(
+                APPS_SCRIPT_URL,
+                {
+                    method:"POST",
+
+                    headers:{
+                        "Content-Type":
+                        "text/plain;charset=utf-8"
+                    },
+
+                    body:
+                        JSON.stringify(payload)
+                }
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if(!data.ok){
+
+            throw new Error(
+                data.error ||
+                "Sheet update failed"
+            );
+
+        }
+
+
+        r.sheetStatus =
+            "ALREADY_UPDATED";
+
+        r.remark =
+            remarkType;
+
+        r.lastUpdate =
+            data.lastUpdate ||
+            "";
+
+        if(data.rowNumber){
+
+            r.sheetRow =
+                data.rowNumber;
+
+        }
+
+        if(data.gid){
+
+            r.sheetGid =
+                data.gid;
+
+        }
+
+        renderTable();
+
+        setStatus(
+            "✅ " +
+            remarkType +
+            " successfully saved to Google Sheet."
+        );
+
+
+    }catch(e){
+
+        console.error(e);
+
+        setStatus(
+            "❌ Google Sheet update failed: " +
+            e.message
+        );
+
+        alert(
+            "Google Sheet Update Failed\n\n" +
+            e.message
+        );
+
+    }
+
+}
+
+
+/* =========================================================
+   DOWNLOAD EXCEL
+========================================================= */
+
+function downloadExcel(){
+
+    if(!records.length){
+
+        alert("No data available.");
+        return;
+
+    }
+
+
+    const data =
+        records.map((r,i)=>({
+
+            "Sr No":
+                i+1,
+
+            "Image Name":
+                r.imageName || "",
+
+            "Meter No":
+                r.meterNo || "",
+
+            "Meter Source":
+                r.meterSource || "",
+
+            "Latitude":
+                r.latitude || "",
+
+            "Longitude":
+                r.longitude || "",
+
+            "GPS Source":
+                r.gpsSource || "",
+
+            "Google Maps":
+                r.googleMaps || "",
+
+            "Duplicate":
+                r.duplicate || "",
+
+            "OCR Text":
+                r.ocrText || "",
+
+            "Remark /Updated / Rechange/already updated":
+                r.remark || "",
+
+            "Last update Date":
+                r.lastUpdate || ""
+
+        }));
+
+
+    const ws =
+        XLSX.utils.json_to_sheet(data);
+
+    const wb =
+        XLSX.utils.book_new();
+
+    XLSX.utils.book_append_sheet(
+        wb,
+        ws,
+        "Meter Analysis"
+    );
+
+    XLSX.writeFile(
+        wb,
+        "Meter_OCR_GPS_GoogleSheet_Analysis.xlsx"
+    );
+
+}
+
+
+/* =========================================================
+   OPEN SHEET
+========================================================= */
+
+function openGoogleSheet(){
+
+    window.open(
+        GOOGLE_SHEET_URL,
+        "_blank"
+    );
+
+}
+
+
+/* =========================================================
+   CLEAR
+========================================================= */
+
+function clearAll(){
+
+    if(
+        !confirm(
+            "Clear all analysis data?"
+        )
+    ) return;
+
+    records = [];
+
+    sheetRows = [];
+
+    document.getElementById("fileInput").value =
+        "";
+
+    document.getElementById("resultBody").innerHTML =
+        "";
+
+    setProgress(0);
+
+    updateCards();
+
+    setStatus(
+        "Ready. Please upload meter photos."
+    );
+
+}
+
+
+/* =========================================================
+   CARD COUNTS
+========================================================= */
+
+function updateCards(){
+
+    document.getElementById("totalCount")
+        .textContent =
+        records.length;
+
+
+    document.getElementById("meterCount")
+        .textContent =
+        records.filter(r=>r.meterNo).length;
+
+
+    document.getElementById("gpsCount")
+        .textContent =
+        records.filter(r=>
+            r.latitude !== "" &&
+            r.longitude !== ""
+        ).length;
+
+
+    document.getElementById("updatedCount")
+        .textContent =
+        records.filter(r=>
+            r.sheetStatus ===
+            "ALREADY_UPDATED"
+        ).length;
+
+
+    document.getElementById("rechangeCount")
+        .textContent =
+        records.filter(r=>
+            String(r.remark || "")
+            .toLowerCase()
+            .includes("rechange")
+        ).length;
+
+
+    document.getElementById("duplicateCount")
+        .textContent =
+        records.filter(r=>
+            r.duplicate === "DUPLICATE"
+        ).length;
+
+}
+
+
+/* =========================================================
+   HELPERS
+========================================================= */
+
+function normalize(value){
+
+    return String(value || "")
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g,"");
+
+}
+
+
+function escapeHtml(value){
+
+    return String(value || "")
+        .replace(/&/g,"&amp;")
+        .replace(/</g,"&lt;")
+        .replace(/>/g,"&gt;")
+        .replace(/"/g,"&quot;")
+        .replace(/'/g,"&#039;");
+
+}
+
+
+function setStatus(message){
+
+    document.getElementById("status")
+        .textContent =
+        message;
+
+}
+
+
+function setProgress(value){
+
+    document.getElementById("progressBar")
+        .style.width =
+        Math.max(
+            0,
+            Math.min(100,value)
+        ) + "%";
+
+}
+
+
+/* =========================================================
+   CLOSE MODAL ON BACKGROUND CLICK
+========================================================= */
+
+document.getElementById("editModal")
+.addEventListener("click",function(e){
+
+    if(e.target === this){
+        closeModal();
+    }
+
+});
+
+</script>
+
+</body>
+</html>
